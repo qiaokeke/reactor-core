@@ -153,7 +153,7 @@ public class LambdaMonoSubscriberTest {
 	}
 
 	@Test
-	public void onNextConsumerExceptionBubblesUpDoesntTriggerCancellation() {
+	public void onNextConsumerExceptionHandledByErrorHandler() {
 		AtomicReference<Throwable> errorHolder = new AtomicReference<>(null);
 
 		LambdaMonoSubscriber<String> tested = new LambdaMonoSubscriber<>(
@@ -164,44 +164,9 @@ public class LambdaMonoSubscriberTest {
 
 		TestSubscription testSubscription = new TestSubscription();
 		tested.onSubscribe(testSubscription);
+		tested.onNext("foo");
 
-		//as Mono is single-value, it cancels early on onNext. this leads to an exception
-		//during onNext to be bubbled up as a BubbledException, not propagated through onNext
-		try {
-			tested.onNext("foo");
-			fail("Expected a bubbling Exception");
-		} catch (RuntimeException e) {
-			assertThat(e).matches(Exceptions::isBubbling, "Expected a bubbling Exception")
-			             .hasCauseInstanceOf(IllegalArgumentException.class);
-		}
-
-		assertThat(errorHolder.get()).as("onError").isNull();
-		assertThat(testSubscription.isCancelled).as("subscription isCancelled").isFalse();
-	}
-
-	@Test
-	public void onNextConsumerFatalDoesntTriggerCancellation() {
-		AtomicReference<Throwable> errorHolder = new AtomicReference<>(null);
-
-		LambdaMonoSubscriber<String> tested = new LambdaMonoSubscriber<>(
-				value -> { throw new OutOfMemoryError(); },
-				errorHolder::set,
-				() -> {},
-				null);
-
-		TestSubscription testSubscription = new TestSubscription();
-		tested.onSubscribe(testSubscription);
-
-		//the error is expected to be thrown as it is fatal
-		try {
-			tested.onNext("foo");
-			fail("Expected OutOfMemoryError to be thrown");
-		}
-		catch (OutOfMemoryError e) {
-			//expected
-		}
-
-		assertThat(errorHolder.get()).as("onError").isNull();
+		assertThat(errorHolder.get()).as("onError").isInstanceOf(IllegalArgumentException.class);
 		assertThat(testSubscription.isCancelled).as("subscription isCancelled").isFalse();
 	}
 
